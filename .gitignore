@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*build/
+*develop-eggs/
+*dist/
+*downloads/
+*eggs/
+*.egg-info/
+env/
+venv/
+multimodal_env/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDEs
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Data and models
+ai_modules/faiss.index
+ai_modules/llm.gguf
+ai_modules/models/plant_doctor_vision.pth
+ai_modules/models/yield_seasonal_model.joblib
+ai_modules/dataset/
+ai_modules/yield_data/

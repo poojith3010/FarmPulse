@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Weather - FarmPulse Pro</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.7.0/vanilla-tilt.min.js"></script>
+  
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <script src="/static/js/app.js"></script>
+
+  <style>
+    :root {
+        --primary: #10b981; 
+        --glass-bg: rgba(5, 10, 8, 0.75);
+        --glass-border: rgba(255, 255, 255, 0.06);
+        --glass-highlight: rgba(255, 255, 255, 0.04);
+    }
+
+    * {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    *::-webkit-scrollbar {
+        display: none;
+    }
+
+    html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow-x: hidden;
+    }
+
+    body {
+        background-color: #050505;
+        color: #ecfdf5;
+        font-family: 'Space Grotesk', sans-serif;
+    }
+
+    /* --- 3D Background --- */
+    #canvas-container { 
+        position: fixed; 
+        top: 0; 
+        left: 0; 
+        width: 100vw !important; 
+        height: 100vh !important; 
+        z-index: -2;
+        pointer-events: none;
+    }
+    #canvas-container canvas {
+        display: block !important;
+        width: 100% !important;
+        height: 100% !important;
+        background: transparent !important;
+    }
+    
+    .ambient-glow {
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        width: 80vw; height: 80vh;
+        background: radial-gradient(circle, rgba(16, 185, 129, 0.05) 0%, transparent 70%);
+        z-index: -1; pointer-events: none;
+    }
+
+    .grid-overlay {
+        position: fixed; inset: 0;
+        background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
+        background-size: 30px 30px; pointer-events: none; z-index: -1;
+    }
+
+    /* --- Glass Panel --- */
+    .glass-panel {
+        background: var(--glass-bg);
+        backdrop-filter: blur(25px);
+        -webkit-backdrop-filter: blur(25px);
+        border: 1px solid var(--glass-border);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        border-top: 1px solid var(--glass-highlight);
+        position: relative;
+        overflow: hidden; 
+        transition: all 0.3s ease;
+    }
+
+    /* --- HIDE SCROLLBAR UTILITY --- */
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+    .no-scrollbar {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+    }
+
+    /* --- Expansion Logic --- */
+    .details-content { 
+        max-height: 0; overflow: hidden; 
+        transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
+        opacity: 0;
+        background: rgba(0,0,0,0.3);
+    }
+    .details-content.open { max-height: 500px; opacity: 1; }
+    .rotate-icon { transition: transform 0.3s ease; }
+    .open .rotate-icon { transform: rotate(180deg); color: var(--primary); }
+
+    /* --- Nav --- */
+    .nav-link.active { color: var(--primary); }
+    .nav-link.active .icon-box { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); color: var(--primary); }
+    
+    /* --- Mobile Optimizations --- */
+    @media (max-width: 768px) {
+        .glass-panel { padding: 1rem !important; }
+        h1 { font-size: 1.75rem !important; }
+        h2 { font-size: 1rem !important; }
+        .text-4xl { font-size: 2rem !important; }
+        .text-3xl { font-size: 1.5rem !important; }
+    }
+  
+  </style>
+</head>
+<body class="antialiased selection:bg-emerald-500 selection:text-black">
+
+  <div id="canvas-container"></div>
+  <div class="ambient-glow"></div>
+  <div class="grid-overlay"></div>
+
+  <div class="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 pt-4 sm:pt-6 md:pt-8 pb-28">
+
+    <div class="flex justify-between items-end mb-8 gap-4 fade-in">
+        <div>
+            <div class="flex items-center gap-2 mb-1">
+                <div class="w-2 h-8 bg-emerald-500 rounded-full shadow-[0_0_15px_#10b981]"></div>
+                <h1 class="text-4xl font-bold tracking-tight">Weather</h1>
+            </div>
+            <p class="text-gray-400 text-sm font-light ml-4">AI Weather Modeling</p>
+        </div>
+    </div>
+
+    <main class="space-y-8">
+      
+      <div class="fade-in">
+        <div class="flex justify-between items-end mb-3 px-1">
+            <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest">Hourly Analysis</h2>
+            <span class="text-xs text-emerald-500 font-mono border border-emerald-500/30 px-2 py-1 rounded">T+24 HOURS</span>
+        </div>
+        
+        <div class="glass-panel rounded-2xl p-4 w-full relative group" data-tilt data-tilt-max="1" data-tilt-speed="1000" data-tilt-glare data-tilt-max-glare="0.05">
+          <div class="overflow-x-auto no-scrollbar">
+             <div id="chartContainer" class="h-80" style="min-width: 1200px;"> 
+                <canvas id="hourlyChart"></canvas>
+             </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="fade-in" style="animation-delay: 0.2s;">
+        <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">Long Range Forecast</h2>
+        <div id="dailyForecastList" class="space-y-3">
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <nav class="fixed bottom-0 left-0 right-0 glass-panel border-t border-white/5 h-20 z-50 rounded-t-2xl md:rounded-none backdrop-blur-xl">
+    <div class="flex justify-center items-center h-full gap-8 md:gap-16">
+        
+        <a href="/dashboard" class="nav-link flex flex-col items-center gap-1 text-gray-500 hover:text-white transition-colors cursor-pointer">
+            <span class="material-icons text-xl">dashboard</span><span class="text-[10px] font-bold uppercase">Dash</span>
+        </a>
+
+        <a href="/static/weather.html" class="nav-link active flex flex-col items-center gap-1 group cursor-pointer">
+            <div class="icon-box w-10 h-8 rounded-lg border border-transparent flex items-center justify-center transition-all">
+                <span class="material-icons text-xl">wb_sunny</span>
+            </div>
+            <span class="text-[10px] font-bold uppercase tracking-wide">Weather</span>
+        </a>
+
+        <a href="/prediction" class="nav-link flex flex-col items-center gap-1 text-gray-500 hover:text-white transition-colors cursor-pointer">
+            <span class="material-icons text-xl">show_chart</span><span class="text-[10px] font-bold uppercase">Predict</span>
+        </a>
+
+        <a href="/static/research.html" class="nav-link flex flex-col items-center gap-1 text-gray-500 hover:text-white transition-colors cursor-pointer">
+            <span class="material-icons text-xl">menu_book</span><span class="text-[10px] font-bold uppercase">Research</span>
+        </a>
+        
+        <a href="/static/doctor.html" class="nav-link flex flex-col items-center gap-1 text-gray-500 hover:text-white transition-colors cursor-pointer">
+            <span class="material-icons text-xl">local_hospital</span><span class="text-[10px] font-bold uppercase">Doctor</span>
+        </a>
+
+    </div>
+  </nav>
+
+<script>
+    // --- 1. THREE.JS BACKGROUND ---
+    const initThreeJS = () => {
+        const container = document.getElementById('canvas-container');
+        if (!container) return;
+        
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050505, 0.035); 
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 8;
+        camera.position.y = 2;
+
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        // Terrain
+        const geoPlane = new THREE.PlaneGeometry(120, 120, 50, 50);
+        const pos = geoPlane.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i);
+            const y = pos.getY(i);
+            pos.setZ(i, Math.sin(x/10) * Math.cos(y/10) * 2.5 + Math.random() * 0.1);
+        }
+        geoPlane.computeVertexNormals();
+        
+        const matPlane = new THREE.MeshStandardMaterial({ 
+            color: 0x022c22, emissive: 0x065f46, emissiveIntensity: 0.15, wireframe: true, transparent: true, opacity: 0.12
+        });
+        const terrain = new THREE.Mesh(geoPlane, matPlane);
+        terrain.rotation.x = -Math.PI / 2.1;
+        terrain.position.y = -3;
+        scene.add(terrain);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.1);
+        scene.add(ambientLight);
+        const pointLight = new THREE.PointLight(0x10b981, 2, 60); 
+        pointLight.position.set(0, 5, 5);
+        scene.add(pointLight);
+
+        let time = 0;
+        const animate = () => {
+            requestAnimationFrame(animate);
+            time += 0.003;
+            terrain.position.z = (Date.now() * 0.001) % 4; 
+            renderer.render(scene, camera);
+        };
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    };
+
+    // --- 2. CHART LOGIC ---
+    function renderHourlyChart(hourlyData) {
+      if (typeof ChartDataLabels !== 'undefined') { Chart.register(ChartDataLabels); }
+      
+      const pointWidth = 100; 
+      const totalWidth = Math.max(hourlyData.length * pointWidth, 1200);
+      const container = document.getElementById("chartContainer");
+      if(container) container.style.width = `${totalWidth}px`;
+      
+      const labels = hourlyData.map(d => [d.time, d.condition]);
+      const temps = hourlyData.map(d => d.temp);
+      const rainProb = hourlyData.map(d => d.rain_prob);
+      const minTemp = Math.min(...temps) - 5;
+      const maxTemp = Math.max(...temps) + 5;
+
+      const canvas = document.getElementById("hourlyChart");
+      if(!canvas) return;
+      
+      const ctxMain = canvas.getContext("2d");
+      if (window.hourlyChartRef instanceof Chart) window.hourlyChartRef.destroy();
+      
+      const tempGradient = ctxMain.createLinearGradient(0, 0, 0, 400);
+      tempGradient.addColorStop(0, 'rgba(16, 185, 129, 0.5)'); 
+      tempGradient.addColorStop(1, 'rgba(16, 185, 129, 0)');
+
+      Chart.defaults.font.family = "'Space Grotesk', sans-serif";
+      Chart.defaults.color = "#9ca3af";
+
+      window.hourlyChartRef = new Chart(ctxMain, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            { 
+              label: 'Temp',
+              type: 'line', 
+              data: temps, 
+              borderColor: '#10b981', 
+              backgroundColor: tempGradient,
+              fill: true,
+              borderWidth: 2, 
+              tension: 0.4, 
+              pointRadius: 4,
+              pointBackgroundColor: '#064e3b',
+              pointBorderColor: '#34d399',
+              yAxisID: 'yTemp',
+              datalabels: { 
+                align: 'top', anchor: 'end', color: '#fff', font: { weight: 'bold', size: 14 }, formatter: (val) => Math.round(val) + '°' 
+              } 
+            },
+            { 
+              label: 'Rain %',
+              type: 'bar', 
+              data: rainProb, 
+              backgroundColor: 'rgba(56, 189, 248, 0.3)',
+              hoverBackgroundColor: 'rgba(56, 189, 248, 0.6)',
+              barThickness: 40,
+              borderRadius: 4,
+              yAxisID: 'yRain', 
+              datalabels: { 
+                  color: '#7dd3fc', anchor: 'end', align: 'top', font: { size: 10, weight: 'bold' }, formatter: (val) => val > 0 ? val + '%' : ''
+              } 
+            }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          animation: { duration: 1500, easing: 'easeOutQuart' },
+          layout: { padding: { top: 30, bottom: 10 } },
+          plugins: { legend: { display: false }, tooltip: { enabled: true } },
+          scales: { 
+            x: { grid: { display: true, color: 'rgba(255, 255, 255, 0.05)', borderDash: [4, 4] }, ticks: { color: '#9ca3af', font: { size: 11 } } }, 
+            yTemp: { display: false, min: minTemp, max: maxTemp }, 
+            yRain: { display: false, min: 0, max: 100 } 
+          }
+        }
+      });
+    }
+
+    function getWeatherIconUrl(code) { return `https://openweathermap.org/img/wn/${code}@2x.png`; }
+    
+    // --- 3. LIST RENDERING ---
+    function renderDailyList(dailyData) {
+      const container = document.getElementById("dailyForecastList");
+      if(!container) return;
+      container.innerHTML = "";
+      dailyData.forEach((day, index) => {
+        const iconUrl = getWeatherIconUrl(day.icon);
+        const card = document.createElement("div");
+        card.className = "glass-panel rounded-xl overflow-hidden transition-all duration-300 mb-2 border border-white/5 hover:border-emerald-500/30";
+        card.innerHTML = `
+          <div class="p-4 flex items-center justify-between cursor-pointer group" onclick="toggleDetails('details-${index}', this)">
+            <div class="flex items-center gap-4">
+               <div class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                 <img src="${iconUrl}" alt="${day.description}" class="w-8 h-8 opacity-80 group-hover:opacity-100 transition-opacity">
+               </div>
+               <div>
+                   <p class="font-bold text-white tracking-wide">${day.date}</p>
+                   <p class="text-xs text-gray-400 capitalize font-mono">${day.description}</p>
+               </div>
+            </div>
+            <div class="flex items-center gap-6">
+               <div class="text-right">
+                   <span class="font-bold text-lg text-emerald-400">${Math.round(day.temp_max)}°</span> 
+                   <span class="text-gray-600 text-sm">/ ${Math.round(day.temp_min)}°</span>
+               </div>
+               <span class="material-icons text-gray-500 rotate-icon group-hover:text-emerald-500">expand_more</span>
+            </div>
+          </div>
+          <div id="details-${index}" class="details-content">
+             <div class="p-4 border-t border-white/5 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono tracking-wide">
+                <div class="flex flex-col items-center p-2 bg-white/5 rounded-lg">
+                    <span class="material-icons text-cyan-400 mb-1 text-base">water_drop</span>
+                    <span class="text-gray-400">Precip</span>
+                    <span class="font-bold text-white">${day.rain_total} mm</span>
+                </div>
+                <div class="flex flex-col items-center p-2 bg-white/5 rounded-lg">
+                    <span class="material-icons text-gray-400 mb-1 text-base">air</span>
+                    <span class="text-gray-400">Wind</span>
+                    <span class="font-bold text-white">${day.wind} m/s</span>
+                </div>
+                <div class="flex flex-col items-center p-2 bg-white/5 rounded-lg">
+                    <span class="material-icons text-blue-400 mb-1 text-base">thermostat</span>
+                    <span class="text-gray-400">Humidity</span>
+                    <span class="font-bold text-white">${day.humidity}%</span>
+                </div>
+                <div class="flex flex-col items-center p-2 bg-white/5 rounded-lg">
+                    <span class="material-icons text-purple-400 mb-1 text-base">speed</span>
+                    <span class="text-gray-400">Pressure</span>
+                    <span class="font-bold text-white">${day.pressure} hPa</span>
+                </div>
+             </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function toggleDetails(contentId, headerEl) {
+       const content = document.getElementById(contentId);
+       const isOpen = content.classList.contains('open');
+       document.querySelectorAll('.details-content.open').forEach(el => el.classList.remove('open'));
+       document.querySelectorAll('.rotate-icon').forEach(el => { el.style.transform = 'rotate(0deg)'; el.style.color = '#6b7280'; });
+       if (!isOpen) { 
+         content.classList.add('open');
+         const icon = headerEl.querySelector('.rotate-icon');
+         icon.style.transform = 'rotate(180deg)';
+         icon.style.color = '#10b981';
+       }
+    }
+
+    async function loadForecast() {
+      try {
+        const res = await fetch(`/forecast`);
+        const data = await res.json();
+        if (!data || !data.daily) return;
+        renderHourlyChart(data.hourly);
+        renderDailyList(data.daily);
+      } catch (err) { console.error(err); }
+    }
+
+    // --- INITIALIZATION ---
+    document.addEventListener("DOMContentLoaded", () => {
+        initThreeJS();
+        if(window.VanillaTilt) VanillaTilt.init(document.querySelectorAll("[data-tilt]"), { max: 3, speed: 400, glare: true, "max-glare": 0.1 });
+        loadForecast(); 
+    });
+  </script>
+
+</body>
+</html>
