@@ -724,15 +724,15 @@
             }, 30);
         }
 
-        // --- SENSOR THRESHOLDS (Optimal ranges for tea/coffee cultivation) ---
+        // --- SENSOR THRESHOLDS (Optimal ranges for Tea - Camellia sinensis) ---
         const THRESHOLDS = {
-            temperature: { min: 15, max: 32, unit: '°C', name: 'Temperature' },
-            humidity: { min: 50, max: 90, unit: '%', name: 'Humidity' },
-            ph_value: { min: 4.5, max: 6.5, unit: '', name: 'pH' },
-            electrical_conductivity: { min: 200, max: 1200, unit: 'μS', name: 'EC' },
-            nitrogen: { min: 20, max: 80, unit: 'mg/kg', name: 'Nitrogen' },
-            phosphorus: { min: 10, max: 50, unit: 'mg/kg', name: 'Phosphorus' },
-            potassium: { min: 80, max: 250, unit: 'mg/kg', name: 'Potassium' }
+            temperature: { min: 13, max: 30, unit: '°C', name: 'Temperature' },      // Tea thrives in 13-30°C, ideal 20-25°C
+            humidity: { min: 70, max: 90, unit: '%', name: 'Humidity' },              // Tea requires high humidity 70-90%
+            ph_value: { min: 4.5, max: 5.5, unit: '', name: 'pH' },                   // Tea prefers acidic soil 4.5-5.5
+            electrical_conductivity: { min: 500, max: 1500, unit: 'μS', name: 'EC' }, // Tea optimal EC 500-1500 μS/cm
+            nitrogen: { min: 200, max: 400, unit: 'mg/kg', name: 'Nitrogen' },        // Tea requires 200-400 mg/kg N
+            phosphorus: { min: 15, max: 30, unit: 'mg/kg', name: 'Phosphorus' },      // Tea requires 15-30 mg/kg P
+            potassium: { min: 150, max: 300, unit: 'mg/kg', name: 'Potassium' }       // Tea requires 150-300 mg/kg K
         };
 
         let alertDismissed = false;
