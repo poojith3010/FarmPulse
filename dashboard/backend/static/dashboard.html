@@ -142,6 +142,147 @@
         .nav-link.active { color: var(--primary); }
         .nav-link.active .icon-box { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); color: var(--primary); }
         
+        /* --- ALERT NOTIFICATION SYSTEM --- */
+        .alert-indicator {
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 700px;
+            height: 6px;
+            background: linear-gradient(90deg, transparent, rgba(239, 68, 68, 0.8), transparent);
+            border-radius: 3px;
+            z-index: 98;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            cursor: pointer;
+        }
+        .alert-indicator.active {
+            opacity: 1;
+            pointer-events: auto;
+            animation: pulse-bar 2s ease-in-out infinite;
+        }
+        .alert-indicator.active:hover {
+            height: 10px;
+            background: linear-gradient(90deg, transparent, rgba(239, 68, 68, 1), transparent);
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+        }
+        @keyframes pulse-bar {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        .alert-container {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100%);
+            z-index: 100;
+            width: 95%;
+            max-width: 700px;
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .alert-container.show {
+            transform: translateX(-50%) translateY(12px);
+        }
+
+        .alert-card {
+            background: rgba(127, 29, 29, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            border-radius: 12px;
+            padding: 8px 14px;
+            box-shadow: 0 8px 32px rgba(239, 68, 68, 0.3), 0 0 60px rgba(239, 68, 68, 0.1);
+        }
+
+        .alert-card .alert-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+
+        .alert-card .alert-icon {
+            width: 24px;
+            height: 24px;
+            background: rgba(239, 68, 68, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: pulse-icon 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse-icon {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .alert-card .alert-title {
+            font-weight: 700;
+            color: #fca5a5;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .alert-card .alert-dismiss {
+            margin-left: auto;
+            background: none;
+            border: none;
+            color: #fca5a5;
+            cursor: pointer;
+            padding: 2px;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+        .alert-card .alert-dismiss:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .alert-card .alert-body {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .alert-chip {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 4px 8px;
+            border-radius: 16px;
+            font-size: 10px;
+            color: #fecaca;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+        .alert-chip .chip-icon {
+            font-size: 12px;
+        }
+        .alert-chip.warning {
+            border-color: rgba(251, 191, 36, 0.4);
+            color: #fde68a;
+        }
+        .alert-chip.critical {
+            border-color: rgba(239, 68, 68, 0.6);
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+        }
+
+        .alert-action {
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 11px;
+            color: #fcd34d;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
         /* Mobile Responsive */
         @media (max-width: 768px) {
             .text-7xl { font-size: 3rem !important; }
@@ -150,10 +291,39 @@
             .glass-panel { padding: 0.75rem !important; }
             .grid { gap: 0.5rem !important; }
             h1 { font-size: 1.75rem !important; }
+            .alert-container { width: 98%; }
+            .alert-indicator { width: 95%; top: 60px; }
+            .alert-chip { font-size: 9px; padding: 3px 6px; }
+            .alert-card { padding: 6px 10px; }
         }
     </style>
 </head>
 <body class="antialiased selection:bg-emerald-500 selection:text-black">
+
+    <!-- Alert Indicator Bar (Clickable to reopen alert) -->
+    <div id="alertIndicator" class="alert-indicator" onclick="reopenAlert()" title="Click to view alerts"></div>
+
+    <!-- Alert Notification Container -->
+    <div id="alertContainer" class="alert-container">
+        <div class="alert-card">
+            <div class="alert-header">
+                <div class="alert-icon">
+                    <span class="material-icons text-red-400 text-lg">warning</span>
+                </div>
+                <span class="alert-title">Sensor Alert</span>
+                <button class="alert-dismiss" onclick="dismissAlert()">
+                    <span class="material-icons text-sm">close</span>
+                </button>
+            </div>
+            <div id="alertBody" class="alert-body">
+                <!-- Alert chips will be inserted here -->
+            </div>
+            <div id="alertAction" class="alert-action">
+                <span class="material-icons text-sm">tips_and_updates</span>
+                <span id="alertRecommendation">Check your sensors</span>
+            </div>
+        </div>
+    </div>
 
     <div id="canvas-container"></div>
     <div class="ambient-glow"></div>
@@ -554,6 +724,157 @@
             }, 30);
         }
 
+        // --- SENSOR THRESHOLDS (Optimal ranges for tea/coffee cultivation) ---
+        const THRESHOLDS = {
+            temperature: { min: 15, max: 32, unit: '°C', name: 'Temperature' },
+            humidity: { min: 50, max: 90, unit: '%', name: 'Humidity' },
+            ph_value: { min: 4.5, max: 6.5, unit: '', name: 'pH' },
+            electrical_conductivity: { min: 200, max: 1200, unit: 'μS', name: 'EC' },
+            nitrogen: { min: 20, max: 80, unit: 'mg/kg', name: 'Nitrogen' },
+            phosphorus: { min: 10, max: 50, unit: 'mg/kg', name: 'Phosphorus' },
+            potassium: { min: 80, max: 250, unit: 'mg/kg', name: 'Potassium' }
+        };
+
+        let alertDismissed = false;
+        let lastAlertHash = '';
+
+        function checkSensorAlerts(data) {
+            if (!data || alertDismissed) return;
+            
+            const alerts = [];
+            let criticalCount = 0;
+            
+            // Check each sensor value against thresholds
+            if (data.temperature != null) {
+                if (data.temperature < THRESHOLDS.temperature.min) {
+                    alerts.push({ type: 'critical', icon: 'ac_unit', text: `Temp LOW: ${data.temperature.toFixed(1)}°C` });
+                    criticalCount++;
+                } else if (data.temperature > THRESHOLDS.temperature.max) {
+                    alerts.push({ type: 'critical', icon: 'local_fire_department', text: `Temp HIGH: ${data.temperature.toFixed(1)}°C` });
+                    criticalCount++;
+                }
+            }
+            
+            if (data.humidity != null) {
+                if (data.humidity < THRESHOLDS.humidity.min) {
+                    alerts.push({ type: 'critical', icon: 'water_drop', text: `Humidity LOW: ${data.humidity.toFixed(0)}%` });
+                    criticalCount++;
+                } else if (data.humidity > THRESHOLDS.humidity.max) {
+                    alerts.push({ type: 'warning', icon: 'water', text: `Humidity HIGH: ${data.humidity.toFixed(0)}%` });
+                }
+            }
+            
+            if (data.ph_value != null) {
+                const ph = parseFloat(convertVoltageToPh(data.ph_value));
+                if (ph < THRESHOLDS.ph_value.min) {
+                    alerts.push({ type: 'warning', icon: 'science', text: `pH LOW: ${ph} (Acidic)` });
+                } else if (ph > THRESHOLDS.ph_value.max) {
+                    alerts.push({ type: 'warning', icon: 'science', text: `pH HIGH: ${ph} (Alkaline)` });
+                }
+            }
+            
+            if (data.electrical_conductivity != null) {
+                if (data.electrical_conductivity < THRESHOLDS.electrical_conductivity.min) {
+                    alerts.push({ type: 'warning', icon: 'bolt', text: `EC LOW: ${data.electrical_conductivity}` });
+                } else if (data.electrical_conductivity > THRESHOLDS.electrical_conductivity.max) {
+                    alerts.push({ type: 'critical', icon: 'bolt', text: `EC HIGH: ${data.electrical_conductivity}` });
+                    criticalCount++;
+                }
+            }
+            
+            // NPK Checks
+            if (data.nitrogen != null && data.nitrogen < THRESHOLDS.nitrogen.min) {
+                alerts.push({ type: 'critical', icon: 'eco', text: `Nitrogen LOW: ${data.nitrogen}` });
+                criticalCount++;
+            }
+            if (data.phosphorus != null && data.phosphorus < THRESHOLDS.phosphorus.min) {
+                alerts.push({ type: 'warning', icon: 'eco', text: `Phosphorus LOW: ${data.phosphorus}` });
+            }
+            if (data.potassium != null && data.potassium < THRESHOLDS.potassium.min) {
+                alerts.push({ type: 'warning', icon: 'eco', text: `Potassium LOW: ${data.potassium}` });
+            }
+            
+            // Generate hash to prevent duplicate alerts
+            const alertHash = JSON.stringify(alerts);
+            if (alertHash === lastAlertHash) return;
+            lastAlertHash = alertHash;
+            
+            // Show or hide alerts
+            if (alerts.length > 0) {
+                showAlert(alerts, criticalCount);
+            } else {
+                hideAlert();
+            }
+        }
+
+        function showAlert(alerts, criticalCount) {
+            const alertBody = document.getElementById('alertBody');
+            const alertIndicator = document.getElementById('alertIndicator');
+            const alertContainer = document.getElementById('alertContainer');
+            const alertRecommendation = document.getElementById('alertRecommendation');
+            
+            // Build alert chips
+            alertBody.innerHTML = alerts.map(alert => `
+                <div class="alert-chip ${alert.type}">
+                    <span class="material-icons chip-icon">${alert.icon}</span>
+                    ${alert.text}
+                </div>
+            `).join('');
+            
+            // Generate recommendation based on alerts
+            let recommendation = '';
+            const alertTexts = alerts.map(a => a.text.toLowerCase());
+            
+            if (alertTexts.some(t => t.includes('humidity low') || t.includes('temp high'))) {
+                recommendation = '💧 Water your crops immediately!';
+            } else if (alertTexts.some(t => t.includes('nitrogen low') || t.includes('phosphorus low') || t.includes('potassium low'))) {
+                recommendation = '🌱 Apply NPK fertilizer soon';
+            } else if (alertTexts.some(t => t.includes('ph low'))) {
+                recommendation = 'ite Apply lime to raise soil pH';
+            } else if (alertTexts.some(t => t.includes('ph high'))) {
+                recommendation = '🧪 Add sulfur to lower soil pH';
+            } else if (alertTexts.some(t => t.includes('ec high'))) {
+                recommendation = '💦 Flush soil with clean water';
+            } else if (alertTexts.some(t => t.includes('temp low'))) {
+                recommendation = '🛡️ Protect crops from cold';
+            } else {
+                recommendation = '📋 Review sensor readings';
+            }
+            
+            alertRecommendation.textContent = recommendation;
+            
+            // Show alert UI
+            alertContainer.classList.add('show');
+            if (criticalCount > 0) {
+                alertIndicator.classList.add('active');
+            }
+        }
+
+        function hideAlert() {
+            document.getElementById('alertContainer').classList.remove('show');
+            // Keep indicator active so user can click to reopen
+        }
+
+        function dismissAlert() {
+            alertDismissed = true;
+            // Hide alert card but keep indicator bar visible
+            document.getElementById('alertContainer').classList.remove('show');
+            // Reset after 5 minutes to allow new alerts
+            setTimeout(() => { 
+                alertDismissed = false; 
+                lastAlertHash = ''; 
+                document.getElementById('alertIndicator').classList.remove('active');
+            }, 300000);
+        }
+
+        function reopenAlert() {
+            // Reopen the alert when clicking on red indicator bar
+            if (alertDismissed && lastAlertHash) {
+                document.getElementById('alertContainer').classList.add('show');
+                alertDismissed = false;
+            }
+        }
+
         // Sensor Logic
         function updateSensorUI(data, withAnimation = false) {
             if (!data) return;
@@ -576,6 +897,9 @@
             
             document.getElementById("sensorPh").textContent = phVal;
             document.getElementById("sensorNPK").textContent = npkValue;
+            
+            // Check for alerts after updating UI
+            checkSensorAlerts(data);
         }
 
         async function loadSensorData() {
