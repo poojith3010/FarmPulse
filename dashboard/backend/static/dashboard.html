@@ -707,7 +707,7 @@
         }
 
         function convertVoltageToPh(voltage) {
-            return voltage.toFixed(2);
+            return voltage;
         }
 
         function textScramble(element, endText, unit = '') {
@@ -879,15 +879,15 @@
         function updateSensorUI(data, withAnimation = false) {
             if (!data) return;
             
-            const tempValue = data.temperature ? data.temperature.toFixed(1) + '°C' : '--';
-            const humidityValue = data.humidity ? data.humidity.toFixed(1) + '%' : '--';
+            const tempValue = data.temperature ? data.temperature + '°C' : '--';
+            const humidityValue = data.humidity ? data.humidity + '%' : '--';
             const phVal = data.ph_value ? convertVoltageToPh(data.ph_value) : '--';
             const ecValue = data.electrical_conductivity ? data.electrical_conductivity : '--';
             const npkValue = `${data.nitrogen || '--'} / ${data.phosphorus || '--'} / ${data.potassium || '--'}`;
             
             if (withAnimation) {
-                textScramble(document.getElementById("sensorTemp"), data.temperature ? data.temperature.toFixed(1) : '--', '°C');
-                textScramble(document.getElementById("sensorHumidity"), data.humidity ? data.humidity.toFixed(1) : '--', '%');
+                textScramble(document.getElementById("sensorTemp"), data.temperature ? String(data.temperature) : '--', '°C');
+                textScramble(document.getElementById("sensorHumidity"), data.humidity ? String(data.humidity) : '--', '%');
                 textScramble(document.getElementById("sensorEc"), ecValue);
             } else {
                 document.getElementById("sensorTemp").textContent = tempValue;
