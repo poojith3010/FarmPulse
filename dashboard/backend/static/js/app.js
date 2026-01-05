@@ -21,14 +21,26 @@ var supabaseClient = window.supabaseClient || window.supabase.createClient(SUPAB
 async function checkAuth() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     const path = window.location.pathname;
+    const search = window.location.search;
+    const urlParams = new URLSearchParams(search);
+    const isAddMode = urlParams.get('mode') === 'add';
     
     const isAuthPage = path === '/' || path.includes('login') || path.includes('signup') || path.includes('forgot'); 
     const isProtectedPage = path.includes('dashboard') || path.includes('prediction') || path.includes('research') || path.includes('doctor');
     const isSetupPage = path.includes('setup-hardware');
 
+    // Debug log
+    console.log('checkAuth:', { path, search, isAddMode, isSetupPage });
+
     if (!session) {
         if (isProtectedPage || isSetupPage) window.location.href = '/'; 
         return;
+    }
+
+    // Allow setup-hardware page in add mode even if user has device - CHECK THIS FIRST
+    if (isSetupPage && isAddMode) {
+        console.log('Add mode detected, staying on setup page');
+        return; // Don't redirect, let them add another device
     }
 
     const { data: profile } = await supabaseClient.from('profiles').select('mac_address').eq('id', session.user.id).single();

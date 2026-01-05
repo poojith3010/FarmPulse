@@ -56,6 +56,11 @@ class DeviceRegister(BaseModel):
 class DeviceVerifyByKey(BaseModel):
     mac_key: str
 
+class UserDeviceLink(BaseModel):
+    user_id: str
+    mac_address: str
+    device_name: str = None
+
 # ==========================================
 #      SECTION 1: HARDWARE & DEVICE API
 # ==========================================
@@ -105,15 +110,21 @@ async def verify_device_key(data: DeviceVerifyByKey):
         device_info = registry.data[0]
         mac_address = device_info['mac_address']
 
-        # B. Check if already owned
-        owner = supabase.table("profiles").select("*").eq("mac_address", mac_address).execute()
-        if owner.data:
-            return JSONResponse(status_code=409, content={"message": "Device already linked to another user."})
+        # B. Check if already linked - try user_devices table first, then profiles
+        try:
+            existing_link = supabase.table("user_devices").select("*").eq("mac_address", mac_address).execute()
+            if existing_link.data:
+                return JSONResponse(status_code=409, content={"message": "Device already linked to another user."})
+        except Exception:
+            # Fallback to profiles table
+            owner = supabase.table("profiles").select("*").eq("mac_address", mac_address).execute()
+            if owner.data:
+                return JSONResponse(status_code=409, content={"message": "Device already linked to another user."})
 
         # C. Activate Device (Set Status = 1)
         supabase.table("device_registry").update({"status_indicator": 1}).eq("mac_address", mac_address).execute()
 
-        # D. Return MAC to Frontend (so Frontend can link it to the User Profile)
+        # D. Return MAC to Frontend (so Frontend can link it to the User via user_devices table)
         return {
             "message": "Device verified & activated", 
             "status": "available", 
@@ -141,14 +152,24 @@ async def log_hardware_data(data: SensorData):
             print(f"💤 Ignored Data from {data.mac_address} (Status: Inactive)")
             return JSONResponse(status_code=403, content={"message": "Device is inactive (Link it in Dashboard)"})
 
-        # 3. Find Owner & Log Data
-        owner = supabase.table("profiles").select("id").eq("mac_address", data.mac_address).execute()
+        # 3. Find Owner via user_devices table first, then fallback to profiles
+        user_id = None
+        try:
+            owner = supabase.table("user_devices").select("user_id").eq("mac_address", data.mac_address).execute()
+            if owner.data:
+                user_id = owner.data[0]['user_id']
+        except Exception:
+            pass
         
-        if not owner.data:
-            print(f"⚠️ Device {data.mac_address} has no owner in Profiles table.")
+        # Fallback to profiles table
+        if not user_id:
+            owner = supabase.table("profiles").select("id").eq("mac_address", data.mac_address).execute()
+            if owner.data:
+                user_id = owner.data[0]['id']
+        
+        if not user_id:
+            print(f"⚠️ Device {data.mac_address} has no owner.")
             return JSONResponse(status_code=403, content={"message": "Unclaimed device"})
-            
-        user_id = owner.data[0]['id']
         
         payload = {
             "user_id": user_id,
@@ -364,3 +385,120 @@ def get_forecast():
     except Exception as e:
         print("❌ FORECAST ERROR:", e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==========================================
+#      SECTION 4: MULTI-DEVICE MANAGEMENT
+# ==========================================
+
+# --- Get All Devices for a User ---
+@app.get("/api/user-devices/{user_id}")
+async def get_user_devices(user_id: str):
+    try:
+        # Try to get devices from user_devices table
+        try:
+            devices = supabase.table("user_devices").select("*").eq("user_id", user_id).execute()
+            if devices.data:
+                return {"devices": devices.data}
+        except Exception as table_err:
+            print(f"⚠️ user_devices table not found or error: {table_err}")
+        
+        # Fallback: Check profiles table for backward compatibility
+        profile = supabase.table("profiles").select("mac_address").eq("id", user_id).execute()
+        if profile.data and profile.data[0].get('mac_address'):
+            # Return the mac_address from profiles as a single device
+            return {"devices": [{
+                "id": 0,
+                "user_id": user_id,
+                "mac_address": profile.data[0]['mac_address'],
+                "device_name": "Device 1"
+            }]}
+        
+        return {"devices": []}
+    except Exception as e:
+        print(f"❌ GET USER DEVICES ERROR: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+# --- Link Device to User (called from setup_hardware) ---
+@app.post("/api/link-device")
+async def link_device(data: UserDeviceLink):
+    print(f"📱 LINK DEVICE REQUEST: user_id={data.user_id}, mac={data.mac_address}, name={data.device_name}")
+    try:
+        device_name = data.device_name if data.device_name else "Device 1"
+        use_new_table = True
+        
+        # Try to use user_devices table first
+        try:
+            # Check if device is already linked to this user
+            existing = supabase.table("user_devices").select("*").eq("user_id", data.user_id).eq("mac_address", data.mac_address).execute()
+            if existing.data:
+                return JSONResponse(status_code=409, content={"message": "Device already linked to your account."})
+            
+            # Check if device is linked to another user
+            other_owner = supabase.table("user_devices").select("*").eq("mac_address", data.mac_address).execute()
+            if other_owner.data:
+                return JSONResponse(status_code=409, content={"message": "Device already linked to another user."})
+            
+            # Count existing devices to set a default name
+            user_devices = supabase.table("user_devices").select("id").eq("user_id", data.user_id).execute()
+            device_count = len(user_devices.data) if user_devices.data else 0
+            device_name = data.device_name if data.device_name else f"Device {device_count + 1}"
+            
+            # Insert new device link
+            supabase.table("user_devices").insert({
+                "user_id": data.user_id,
+                "mac_address": data.mac_address,
+                "device_name": device_name
+            }).execute()
+            
+        except Exception as table_err:
+            print(f"⚠️ user_devices table not available, using profiles fallback: {table_err}")
+            use_new_table = False
+        
+        # Always update profiles table for backward compatibility
+        profile = supabase.table("profiles").select("mac_address").eq("id", data.user_id).execute()
+        if profile.data:
+            current_mac = profile.data[0].get('mac_address')
+            # If no mac_address set, or if user_devices table is not available
+            if not current_mac or not use_new_table:
+                supabase.table("profiles").update({"mac_address": data.mac_address}).eq("id", data.user_id).execute()
+        
+        return {"message": "Device linked successfully", "device_name": device_name}
+    except Exception as e:
+        print(f"❌ LINK DEVICE ERROR: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+# --- Update Device Name ---
+@app.put("/api/user-devices/{device_id}")
+async def update_device_name(device_id: int, device_name: str):
+    try:
+        supabase.table("user_devices").update({"device_name": device_name}).eq("id", device_id).execute()
+        return {"message": "Device name updated"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+# --- Remove Device from User ---
+@app.delete("/api/user-devices/{device_id}")
+async def remove_user_device(device_id: int):
+    try:
+        # Get device info before deleting
+        device = supabase.table("user_devices").select("*").eq("id", device_id).execute()
+        if device.data:
+            mac_address = device.data[0]['mac_address']
+            # Set device status back to inactive
+            supabase.table("device_registry").update({"status_indicator": 0}).eq("mac_address", mac_address).execute()
+        
+        # Remove link
+        supabase.table("user_devices").delete().eq("id", device_id).execute()
+        return {"message": "Device removed"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+# --- Get Sensor Data for Specific Device ---
+@app.get("/api/sensor-data/{user_id}/{mac_address}")
+async def get_sensor_data_for_device(user_id: str, mac_address: str):
+    try:
+        data = supabase.table("sensor_data").select("*").eq("user_id", user_id).eq("mac_address", mac_address).order("created_at", desc=True).limit(1).execute()
+        return {"data": data.data[0] if data.data else None}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})

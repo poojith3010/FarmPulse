@@ -97,6 +97,10 @@
           <button id="connectBtn" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white p-3 rounded-lg font-bold uppercase tracking-wide transition-all hover:scale-[1.02] shadow-[0_0_20px_rgba(16,185,129,0.4)] mt-4">
             Activate & Link
           </button>
+          
+          <button id="backBtn" class="w-full bg-transparent border border-gray-600 hover:border-gray-400 text-gray-400 hover:text-white p-3 rounded-lg font-medium uppercase tracking-wide transition-all mt-3 hidden">
+            ← Back to Dashboard
+          </button>
         </div>
       </div>
     </div>
@@ -306,6 +310,23 @@
   </script>
 
   <script>
+    // Check if this is add mode (adding another device)
+    const urlParams = new URLSearchParams(window.location.search);
+    const isAddMode = urlParams.get('mode') === 'add';
+    
+    // Update UI for add mode
+    if (isAddMode) {
+        document.querySelector('h1').textContent = 'Add New Device';
+        document.querySelector('p.text-gray-400').textContent = 'Enter the 4-digit key of your new device.';
+        document.getElementById('connectBtn').textContent = 'Add Device';
+        document.getElementById('backBtn').classList.remove('hidden');
+    }
+    
+    // Back button handler
+    document.getElementById('backBtn').addEventListener('click', () => {
+        window.location.href = '/dashboard';
+    });
+    
     document.getElementById("connectBtn").addEventListener("click", async () => {
         const key = document.getElementById("deviceKey").value.trim();
 
@@ -340,23 +361,33 @@
             }
 
             // 2. Backend verified it and returned the MAC address
-            // Now link this MAC to the user's profile
+            // Now link this MAC to the user via the new user_devices API
             const macAddress = result.mac_address;
             btn.textContent = "Linking...";
             
-            const { error: updateError } = await supabaseClient
-                .from('profiles')
-                .update({ mac_address: macAddress })
-                .eq('id', user.id);
-
-            if (updateError) {
-                console.error(updateError);
-                alert("❌ Database Error: " + updateError.message);
+            // Use the new multi-device API to link the device
+            const linkPayload = { 
+                user_id: user.id, 
+                mac_address: macAddress
+            };
+            
+            const linkResponse = await fetch('/api/link-device', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(linkPayload)
+            });
+            
+            const linkResult = await linkResponse.json();
+            
+            if (!linkResponse.ok) {
+                alert("❌ " + linkResult.message);
                 btn.disabled = false;
-            } else {
-                alert("✅ Device Activated! Redirecting...");
-                window.location.href = "/dashboard";
+                btn.textContent = isAddMode ? "Add Device" : "Activate & Link";
+                return;
             }
+
+            alert(`✅ ${isAddMode ? 'Device Added!' : 'Device Activated!'} (${linkResult.device_name}) Redirecting...`);
+            window.location.href = "/dashboard";
 
         } catch (err) {
             console.error(err);
